@@ -753,8 +753,9 @@
         const evaluationData = allData.filter((_, i) => i !== 2);
 
         let currentPage = 0;
-        let pages = ['consent', 'instructions', 'training'];
+        let pages = [];
         let formData = {};
+        let pagesReady = false;
 
         function nextPage() {
             if (currentPage === 0) {
@@ -776,6 +777,8 @@
             if (currentPage < pages.length - 1) {
                 currentPage = currentPage + 1;
                 showPage(currentPage);
+            } else {
+                console.log('Already at last page');
             }
         }
 
@@ -787,6 +790,10 @@
         }
 
         function showPage(pageNum) {
+            if (!pagesReady && pageNum !== 0) {
+                console.warn('Pages not fully ready, but attempting to show page:', pageNum);
+            }
+
             if (pageNum < 0 || pageNum >= pages.length) {
                 console.error('Invalid page number:', pageNum, 'Total pages:', pages.length);
                 return;
@@ -800,15 +807,15 @@
                 window.scrollTo(0, 0);
             } else {
                 console.error('Page not found:', pageId);
+                return;
             }
 
-            const progress = ((pageNum + 1) / (pages.length)) * 100;
+            const progress = ((pageNum + 1) / pages.length) * 100;
             const progressBar = document.querySelector('.progress-fill');
             if (progressBar) {
                 progressBar.style.width = progress + '%';
             }
 
-            localStorage.setItem('urdEvalCurrentPage', pageNum);
             currentPage = pageNum;
         }
 
@@ -948,8 +955,9 @@
             }
         }
 
-        document.addEventListener('change', saveFormData);
-        document.addEventListener('input', saveFormData);
+        // Removed localStorage saving since responses will go to Google Sheet
+        // document.addEventListener('change', saveFormData);
+        // document.addEventListener('input', saveFormData);
 
         function generateEvaluationPage(sentenceNum, data) {
             const pageId = `page-eval${sentenceNum}`;
@@ -983,10 +991,15 @@
         }
 
         function goToPage(pageNum) {
+            if (!pagesReady) {
+                console.error('Pages not ready yet');
+                return;
+            }
             if (pageNum >= 0 && pageNum < pages.length) {
+                currentPage = pageNum;
                 showPage(pageNum);
             } else {
-                console.error('Invalid page number for goToPage:', pageNum);
+                console.error('Invalid page number for goToPage:', pageNum, 'Total pages:', pages.length);
             }
         }
 
@@ -1054,6 +1067,13 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            // Clear localStorage to start fresh (responses will go to Google Sheet)
+            localStorage.removeItem('urdEvalForm');
+            localStorage.removeItem('urdEvalCurrentPage');
+
+            // Initialize pages array with all page names
+            pages = ['consent', 'instructions', 'training'];
+
             // Generate training page content
             for (let step = 1; step <= 6; step++) {
                 document.getElementById('training-content').innerHTML += createStepHTML(step, trainingData.key);
@@ -1092,20 +1112,16 @@
             const lastEvalPage = document.querySelector('#page-eval12');
             const buttons = lastEvalPage.querySelector('.button-group');
             buttons.innerHTML = `
-                <button class="btn-secondary" onclick="goToPage(${pages.length - 2})">Back</button>
+                <button class="btn-secondary" onclick="previousPage()">Back</button>
                 <button class="btn-primary" onclick="submitForm()">Submit Evaluation</button>
             `;
 
-            // Load saved data
-            loadFormData();
+            // Mark pages as ready
+            pagesReady = true;
+            currentPage = 0;
 
-            // Restore to last page viewed
-            const savedPage = localStorage.getItem('urdEvalCurrentPage');
-            if (savedPage) {
-                showPage(parseInt(savedPage));
-            } else {
-                showPage(0);
-            }
+            // Show the first page
+            showPage(0);
         });
     </script>
 </body>
